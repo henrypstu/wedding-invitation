@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Henry & Vivin - Wedding</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;font-family:'Courier New',monospace;overflow:hidden;height:100vh;display:flex;justify-content:center;align-items:center}
+.screen{display:none;width:100%;height:100vh;position:absolute;top:0;left:0}
+.screen.active{display:flex;flex-direction:column;align-items:center;justify-content:center}
+#cover{background:linear-gradient(180deg,#2d1b4e 0%,#4a2c6e 30%,#6b3a7d 60%,#c97b3a 85%,#e8a84c 100%);text-align:center;color:#fff;gap:20px}
+#cover h3{font-size:14px;letter-spacing:3px;opacity:.7;text-transform:uppercase}
+#cover h1{font-size:36px;font-weight:bold;text-shadow:2px 2px 8px rgba(0,0,0,.5)}
+#cover .heart{color:#e85d75;font-size:28px}
+#cover .date{font-size:16px;opacity:.8;margin-top:-10px}
+#cover button{background:#4caf50;color:#fff;border:none;padding:14px 40px;font-size:16px;border-radius:25px;cursor:pointer;font-family:inherit;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+#charselect{background:linear-gradient(180deg,#2d1b4e 0%,#4a2c6e 50%,#6b3a7d 100%);text-align:center;color:#fff;gap:30px}
+#charselect h2{font-size:20px}
+.char-options{display:flex;gap:30px}
+.char-option{background:rgba(255,255,255,.1);border:3px solid rgba(255,255,255,.3);border-radius:16px;padding:20px 30px;cursor:pointer;transition:all .2s}
+.char-option:hover,.char-option:active{border-color:#4caf50;background:rgba(76,175,80,.2);transform:scale(1.05)}
+.char-option .label{font-size:14px;color:#fff}
+.char-option canvas{display:block;margin:0 auto 10px;image-rendering:pixelated}
+#game-screen{background:#3a7a20;justify-content:flex-start;align-items:center;padding-top:10px}
+canvas#game{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;justify-content:center;align-items:center;padding:20px}
+#modal-overlay.active{display:flex}
+#modal{background:transparent;border:none;max-width:340px;width:100%;max-height:82vh;position:relative;animation:modalIn .3s;padding:0;border-radius:0;box-shadow:none;overflow:visible}
+@keyframes modalIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+#modal::before,#modal::after{display:none}
+#modal-inner{position:relative;background:url('preferences-2/scroll.png') center/100% 100% no-repeat;padding:80px 50px 70px;min-height:300px;display:flex;flex-direction:column;justify-content:center}
+#modal-content{overflow-y:auto;max-height:55vh}
+#modal h2{font-size:16px;margin-bottom:14px;color:#3d2010;text-align:center;font-weight:bold}
+#modal p{font-size:13px;color:#3d2010;line-height:1.7;margin-bottom:6px}
+#modal .close-btn{position:absolute;top:30px;right:30px;font-size:22px;cursor:pointer;color:#5c3a10;border:none;background:none;font-weight:bold;z-index:10}
+#modal hr{border:none;border-top:2px dashed #8a7a40;margin:12px 0}
+#modal input,#modal select,#modal textarea{font-family:inherit;background:rgba(255,255,220,.5);border:2px solid #8a7a40;color:#3d2010;width:100%;padding:8px;margin-bottom:10px;font-size:13px;border-radius:4px}
+#modal button:not(.close-btn){font-family:inherit;background:#5c8a2a;color:#fff;border:2px solid #3d6a1a;padding:8px 20px;cursor:pointer;border-radius:4px}
+#controls{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:none;z-index:50}
+#controls.active{display:block}
+.dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:3px}
+.dpad button{background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);color:#fff;font-size:18px;border-radius:8px;touch-action:manipulation}
+.dpad button:active{background:rgba(76,175,80,.5)}
+.dpad .empty{visibility:hidden}
+#interact-hint{position:fixed;bottom:150px;left:50%;transform:translateX(-50%);color:#fff;font-size:12px;background:rgba(0,0,0,.6);padding:6px 14px;border-radius:20px;display:none;z-index:50}
+#interact-hint.active{display:block}
+</style>
+</head>
+<body>
+<div id="cover" class="screen active">
+<h3>The Wedding Of</h3>
+<h1>Henry <span class="heart">♥</span> Vivin</h1>
+<p class="date">08 . 08 . 2026</p>
+<button onclick="bgm.play();showScreen('charselect')">Open Invitation</button>
+</div>
+<div id="charselect" class="screen">
+<h2>Pilih karaktermu:</h2>
+<div class="char-options">
+<div class="char-option" onclick="selectChar('male')"><canvas id="prev-m" width="48" height="72" style="image-rendering:pixelated"></canvas><span class="label">Pria</span></div>
+<div class="char-option" onclick="selectChar('female')"><canvas id="prev-f" width="48" height="76" style="image-rendering:pixelated"></canvas><span class="label">Wanita</span></div>
+</div>
+</div>
+<div id="game-screen" class="screen"><canvas id="game"></canvas></div>
+<div id="modal-overlay" onclick="closeModal(event)">
+<div id="modal"><div id="modal-inner"><button class="close-btn" onclick="closeModalDirect()">✕</button><div id="modal-content"></div></div></div>
+</div>
+<div id="controls"><div class="dpad">
+<button class="empty"></button><button id="bu">▲</button><button class="empty"></button>
+<button id="bl">◀</button><button id="ba" style="font-size:12px">●</button><button id="br">▶</button>
+<button class="empty"></button><button id="bd">▼</button><button class="empty"></button>
+</div></div>
+<div id="interact-hint"></div>
+<script>
+const T=16,COLS=30,ROWS=22;
+let SCALE,CW,CH,playerType='male',gameStarted=false;
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const BASE="preferences-2/isaiah658%26%23039%3Bs-Pixel-Pack-%231/isaiah658%27s-Pixel-Pack/";
+const BASE2="preferences-2/submission_daneeklu/submission_daneeklu/tilesets/";
+
+function loadImg(src){const img=new Image();img.src=src;return img;}
+
+// Ground tiles (16x16 each)
+const grass=loadImg(BASE+'Tiles/Grass/grass-1.png');
+const darkGrass=loadImg(BASE+'Tiles/Grass/dark-grass-middle-middle.png');
+const flowers1=loadImg(BASE+'Tiles/Grass/flowers1-single.png');
+const flowers2=loadImg(BASE+'Tiles/Grass/flowers2-single.png');
+// Dirt path tiles
+const dp={};
+for(let i=1;i<=19;i++)dp[i]=loadImg(BASE+'Tiles/Dirt Path/dirtpath-'+i+'.png');
+
+// Objects (isaiah658)
+const house1=loadImg(BASE+'Objects/Buildings/house-1.png');
+const fountain=loadImg(BASE+'Objects/Other/water-fountain.png');
+const sign1=loadImg(BASE+'Objects/Other/sign-1.png');
+const mailbox=loadImg(BASE+'Objects/Other/mailbox-1.png');
+const bench=loadImg(BASE+'Objects/Other/park-bench.png');
+// Characters
+const charMale=loadImg(BASE+'Characters/tuxedo-man.png');
+const charFemale=loadImg(BASE+'Characters/kaylee.png');
+// Wood Fence (isaiah658, all 16x16)
+const WF=BASE+'Objects/Fences/Wood%20Fence/';
+const wfTL=loadImg(WF+'wood-fence-top-left-corner.png');
+const wfTM=loadImg(WF+'wood-fence-top-middle.png');
+const wfTR=loadImg(WF+'wood-fence-top-right-corner.png');
+const wfLM=loadImg(WF+'wood-fence-left-middle.png');
+const wfRM=loadImg(WF+'wood-fence-right-middle.png');
+const wfBL=loadImg(WF+'wood-fence-left-bottom-corner.png');
+const wfBM=loadImg(WF+'wood-fence-bottom-middle.png');
+const wfBR=loadImg(WF+'wood-fence-right-bottom-corner.png');
+// Trees & Shrubs (isaiah658)
+const TS=BASE+'Objects/Trees%20and%20Shrubs/';
+const tree1=loadImg(TS+'tree-1.png');// 71x94
+const tree2=loadImg(TS+'tree-2.png');// 71x94
+const pineTree=loadImg(TS+'pine-tree.png');// 50x82
+const bushImg=loadImg(TS+'bush.png');// 32x32
+const smallBush=loadImg(TS+'small-bushes.png');// 16x16
+// Bazaar stalls (64x64 ns, 128x96 ew)
+const stallBlue=loadImg('preferences-2/lpc_bazaar_rework-1.0-1/PNG/32x32/bazaar_table-ns-blue.png');
+const stallRed=loadImg('preferences-2/lpc_bazaar_rework-1.0-1/PNG/32x32/bazaar_table-ns-red.png');
+
+// Character select preview
+charMale.onload=()=>{const c=document.getElementById('prev-m').getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(charMale,0,0,16,24,8,12,32,48);};
+charFemale.onload=()=>{const c=document.getElementById('prev-f').getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(charFemale,0,0,16,25,8,12,32,50);};
+
+// --- CHURCH COURTYARD LAYOUT (30x22) ---
+// Concept: Fenced church yard. House=chapel at top center, fountain in middle,
+// fence surrounds the whole yard, gate at bottom center, trees outside fence
+const PATH=[];
+for(let y=0;y<ROWS;y++){PATH[y]=[];for(let x=0;x<COLS;x++)PATH[y][x]=0;}
+
+// Main vertical aisle (col 14-15, from gate to chapel)
+for(let y=5;y<20;y++){PATH[y][14]=1;PATH[y][15]=1;}
+// Horizontal path (row 12-13)
+for(let x=5;x<25;x++){PATH[12][x]=1;PATH[13][x]=1;}
+// Small paths to sides
+for(let x=10;x<20;x++){PATH[8][x]=1;}
+
+// Fence border: rect from (3,2) to (26,19)
+const FENCE={x:0,y:0,w:30,h:22,gateX:13,gateY:21,gateW:4};
+
+// Interactable objects
+const OBJECTS=[
+{x:11,y:2,w:7,h:6,type:'house',modalId:'venue',label:'Wedding Chapel'},
+{x:13,y:14,w:4,h:3,type:'fountain',modalId:'story',label:'Our Love Story'},
+{x:6,y:12,w:1,h:1,type:'sign',modalId:'info',label:'Save the Date'},
+{x:23,y:12,w:1,h:1,type:'mailbox',modalId:'gift',label:'Love Gift'},
+{x:6,y:8,w:2,h:1,type:'bench',modalId:'wishes',label:'Ucapan & Doa'},
+{x:22,y:8,w:2,h:2,type:'stall',img:'stallBlue',modalId:'rsvp',label:'RSVP'},
+{x:7,y:14,w:2,h:2,type:'stall',img:'stallRed',modalId:'gallery',label:'Gallery'},
+{x:21,y:14,w:2,h:2,type:'stall',img:'stallBlue',modalId:'prewed',label:'Pre-Wedding Video'},
+];
+
+// Trees & bushes inside yard (isaiah658 individual PNGs)
+const TREES=[
+{x:2,y:2,img:'tree1'},{x:6,y:1,img:'pine'},{x:23,y:1,img:'pine'},{x:26,y:2,img:'tree2'},
+{x:2,y:10,img:'bush'},{x:2,y:16,img:'bush'},{x:26,y:10,img:'bush'},{x:26,y:16,img:'bush'},
+{x:4,y:18,img:'pine'},{x:8,y:19,img:'bush'},{x:20,y:19,img:'bush'},{x:24,y:18,img:'pine'},
+];
+
+// Flowers inside courtyard
+const FLOWERS=[
+[8,5],[9,5],[10,5],[8,6],[9,6],[10,6],
+[19,5],[20,5],[21,5],[19,6],[20,6],[21,6],
+[5,15],[6,15],[7,15],[22,15],[23,15],[24,15],
+[5,10],[6,10],[23,10],[24,10],
+];
+
+const MODALS={
+venue:{title:'💒 The Bride & Groom',body:'<div style="text-align:center"><img src="groom-photo.jpeg" style="width:80px;height:80px;border-radius:50%;border:3px solid #8b5e14;object-fit:cover"><h3 style="margin:8px 0 2px;color:#3d2010">Henry</h3><p style="font-size:11px;color:#5c3a10">Putra dari<br>Bpk. ... & Ibu ...</p></div><hr><div style="text-align:center"><img src="bride-photo.jpeg" style="width:80px;height:80px;border-radius:50%;border:3px solid #8b5e14;object-fit:cover"><h3 style="margin:8px 0 2px;color:#3d2010">Vivin</h3><p style="font-size:11px;color:#5c3a10">Putri dari<br>Bpk. ... & Ibu ...</p></div><hr><p style="text-align:center;font-size:12px;color:#3d2010"><b>Sabtu, 8 Agustus 2026</b></p>'},
+info:{title:'📋 Save the Date',body:'<p style="text-align:center"><b>Henry & Vivin</b></p><p style="text-align:center">08 . 08 . 2026</p><hr><p><b>Dresscode:</b> Formal / Semi-formal</p><p>Warna: Pastel / Earth tone</p><hr><p><b>Pemberkatan:</b> 10:00 WIB</p><p><b>Resepsi:</b> 18:00 WIB</p>'},
+story:{title:'💒 Our Love Story',body:'<p style="text-align:center"><b>~ The Beginning ~</b></p><p>Pertemuan pertama yang tidak terduga, menjadi awal perjalanan indah kami.</p><hr><p style="text-align:center"><b>~ Forever ~</b></p><p>Dan kini, kami siap memulai babak baru bersama. ❤️</p>'},
+gift:{title:'📮 Love Gift',body:'<p>Doa restu Anda sangat berarti bagi kami.</p><hr><p><b>Bank BCA</b></p><p>1234567890</p><p>a.n. Henry</p><hr><p><b>Kirim Hadiah:</b></p><p>Jl. Gajah Mada No. 88, Jakarta Barat</p>'},
+wishes:{title:'🪵 Ucapan & Doa',body:'<p>Tuliskan ucapan untuk mempelai:</p><textarea id="wish-input" rows="3" placeholder="Tulis ucapanmu..."></textarea><button onclick="sendWish()">Kirim</button><div id="wish-list"></div>'},
+rsvp:{title:'💌 RSVP',body:'<p>Konfirmasi kehadiranmu:</p><input id="rsvp-name" placeholder="Nama kamu"><select id="rsvp-attend"><option>Ya, saya hadir</option><option>Maaf, tidak bisa</option></select><input id="rsvp-count" type="number" value="1" min="1" max="5"><button onclick="sendRsvp()">Kirim RSVP</button>'},
+prewed:{title:'🎬 Pre-Wedding',body:'<div style="text-align:center"><video controls style="width:100%;border:2px solid #8b5e14;border-radius:4px" src="pantai payung.mp4"></video><p style="margin-top:10px;font-size:12px">Henry & Vivin Pre-Wedding 💕</p></div>'},
+gallery:{title:'📸 Gallery',body:'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><img src="groom-photo.jpeg" style="width:100%;border-radius:4px;border:2px solid #8b5e14;object-fit:cover;aspect-ratio:1"><img src="bride-photo.jpeg" style="width:100%;border-radius:4px;border:2px solid #8b5e14;object-fit:cover;aspect-ratio:1"></div><p style="text-align:center;margin-top:10px;font-size:11px;color:#5c3a10">More photos coming soon 💕</p>'}
+};
+
+let player={x:14,y:19,dir:0},keys={},nearObj=null,moveTimer=0;
+
+function calcScale(){
+  const maxW=window.innerWidth, maxH=window.innerHeight-20;
+  SCALE=Math.max(1,Math.min(Math.floor(maxW/(COLS*T)),Math.floor(maxH/(ROWS*T)),3));
+  CW=COLS*T*SCALE;CH=ROWS*T*SCALE;
+  canvas.width=CW;canvas.height=CH;
+  canvas.style.width=CW+'px';canvas.style.height=CH+'px';
+}
+
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='game-screen'){startGame();document.getElementById('controls').classList.add('active');}}
+function selectChar(t){playerType=t;showScreen('game-screen');}
+
+// Collision
+function blocked(tx,ty){
+  if(tx<0||ty<0||tx>=COLS||ty>=ROWS)return true;
+  // Fence border
+  const f=FENCE;
+  if(tx>=f.x&&tx<f.x+f.w&&ty>=f.y&&ty<f.y+f.h){
+    const onBorder=(tx===f.x||tx===f.x+f.w-1||ty===f.y||ty===f.y+f.h-1);
+    if(onBorder){
+      // Gate opening at bottom center
+      if(ty===f.y+f.h-1&&tx>=f.gateX&&tx<f.gateX+f.gateW)return false;
+      return true;
+    }
+  }
+  // House/chapel
+  const h=OBJECTS[0];if(tx>=h.x&&tx<h.x+h.w&&ty>=h.y&&ty<h.y+h.h)return true;
+  // Fountain
+  const fo=OBJECTS[1];if(tx>=fo.x&&tx<fo.x+fo.w&&ty>=fo.y&&ty<fo.y+fo.h)return true;
+  // Objects (sign/mailbox/bench)
+  for(let i=2;i<OBJECTS.length;i++){const o=OBJECTS[i];if(tx>=o.x&&tx<o.x+o.w&&ty===o.y)return true;}
+  return false;
+}
+
+// Input
+document.addEventListener('keydown',e=>{keys[e.key]=true;if((e.key===' '||e.key==='Enter')&&nearObj&&gameStarted){e.preventDefault();openModal(nearObj.modalId);}});
+document.addEventListener('keyup',e=>keys[e.key]=false);
+['bu','bd','bl','br'].forEach((id,i)=>{const k=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'][i],b=document.getElementById(id);b.addEventListener('touchstart',e=>{e.preventDefault();keys[k]=true;});b.addEventListener('touchend',e=>{e.preventDefault();keys[k]=false;});});
+document.getElementById('ba').addEventListener('touchstart',e=>{e.preventDefault();if(nearObj)openModal(nearObj.modalId);});
+
+function openModal(id){const m=MODALS[id];if(!m)return;document.getElementById('modal-content').innerHTML='<h2>'+m.title+'</h2>'+m.body;document.getElementById('modal-overlay').classList.add('active');if(id==='wishes')loadWishes();}
+function closeModal(e){if(e.target===document.getElementById('modal-overlay'))closeModalDirect();}
+function closeModalDirect(){document.getElementById('modal-overlay').classList.remove('active');}
+function sendWish(){const inp=document.getElementById('wish-input');if(!inp.value.trim())return;let w=JSON.parse(localStorage.getItem('hw-wishes')||'[]');w.unshift({text:inp.value.trim(),date:new Date().toLocaleDateString()});localStorage.setItem('hw-wishes',JSON.stringify(w));inp.value='';loadWishes();}
+function loadWishes(){const el=document.getElementById('wish-list');if(!el)return;const w=JSON.parse(localStorage.getItem('hw-wishes')||'[]');el.innerHTML=w.map(i=>'<div style="background:#c9953a;padding:6px 10px;border:2px solid #8b5e14;margin-top:8px"><small style="color:#5c3a10">'+i.date+'</small><p style="font-size:12px;color:#3d2010;margin-top:4px">'+i.text+'</p></div>').join('');}
+function sendRsvp(){const n=document.getElementById('rsvp-name').value.trim();if(!n){alert('Isi nama dulu!');return;}alert('Terima kasih '+n+'! RSVP tercatat ❤️');closeModalDirect();}
+
+// --- DRAWING ---
+function getDirtTile(x,y){
+  const u=PATH[y-1]?PATH[y-1][x]:0,d=PATH[y+1]?PATH[y+1][x]:0;
+  const l=PATH[y][x-1]||0,r=PATH[y][x+1]||0;
+  // All neighbors = middle
+  if(u&&d&&l&&r)return dp[5];
+  // Edges
+  if(!u&&d&&l&&r)return dp[2];// top edge middle
+  if(u&&!d&&l&&r)return dp[8];// bottom edge middle
+  if(u&&d&&!l&&r)return dp[4];// left edge middle
+  if(u&&d&&l&&!r)return dp[6];// right edge middle
+  // Corners
+  if(!u&&!l&&d&&r)return dp[1];// top-left
+  if(!u&&!r&&d&&l)return dp[3];// top-right
+  if(!d&&!l&&u&&r)return dp[7];// bottom-left
+  if(!d&&!r&&u&&l)return dp[9];// bottom-right
+  // Dead ends
+  if(u&&d&&!l&&!r)return dp[5];// vertical
+  if(!u&&!d&&l&&r)return dp[5];// horizontal
+  return dp[5];
+}
+
+function drawGround(){
+  const s=T*SCALE;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    ctx.drawImage(grass,0,0,16,16,x*s,y*s,s,s);
+    // Subtle dark grass variation
+    if((x+y*3)%7===0)ctx.drawImage(darkGrass,0,0,16,16,x*s,y*s,s,s);
+    // Dirt path
+    if(PATH[y][x]===1){
+      const tile=getDirtTile(x,y);
+      if(tile)ctx.drawImage(tile,0,0,16,16,x*s,y*s,s,s);
+    }
+  }
+}
+
+function drawFence(){
+  const s=T*SCALE,f=FENCE;
+  // Top edge
+  for(let x=f.x;x<f.x+f.w;x++){
+    let tile=x===f.x?wfTL:x===f.x+f.w-1?wfTR:wfTM;
+    if(tile&&tile.complete)ctx.drawImage(tile,0,0,16,16,x*s,f.y*s,s,s);
+  }
+  // Bottom edge
+  for(let x=f.x;x<f.x+f.w;x++){
+    if(x>=f.gateX&&x<f.gateX+f.gateW)continue;// gate opening
+    let tile=x===f.x?wfBL:x===f.x+f.w-1?wfBR:wfBM;
+    if(tile&&tile.complete)ctx.drawImage(tile,0,0,16,16,x*s,(f.y+f.h-1)*s,s,s);
+  }
+  // Left edge
+  for(let y=f.y+1;y<f.y+f.h-1;y++){if(wfLM.complete)ctx.drawImage(wfLM,0,0,16,16,f.x*s,y*s,s,s);}
+  // Right edge
+  for(let y=f.y+1;y<f.y+f.h-1;y++){if(wfRM.complete)ctx.drawImage(wfRM,0,0,16,16,(f.x+f.w-1)*s,y*s,s,s);}
+}
+
+function drawDecos(){
+  const s=T*SCALE;
+  // Draw trees/bushes
+  const imgMap={tree1,tree2,pine:pineTree,bush:bushImg};
+  for(let t of TREES){
+    const img=imgMap[t.img];if(!img||!img.complete)continue;
+    ctx.drawImage(img,0,0,img.naturalWidth,img.naturalHeight,t.x*s,t.y*s,img.naturalWidth*SCALE,img.naturalHeight*SCALE);
+  }
+  // Flowers
+  for(let f of FLOWERS){
+    const img=(f[0]+f[1])%2===0?flowers1:flowers2;
+    if(img&&img.complete)ctx.drawImage(img,0,0,16,16,f[0]*s,f[1]*s,s,s);
+  }
+}
+
+function drawObjects(){
+  const s=T*SCALE;
+  // House
+  const h=OBJECTS[0];
+  if(house1.complete)ctx.drawImage(house1,0,0,112,112,(h.x*T)*SCALE,(h.y*T)*SCALE,112*SCALE,112*SCALE);
+  // Fountain
+  const f=OBJECTS[1];
+  if(fountain.complete)ctx.drawImage(fountain,0,0,64,48,(f.x*T)*SCALE,(f.y*T)*SCALE,64*SCALE,48*SCALE);
+  // Signs, mailboxes, bench, stalls
+  for(let i=2;i<OBJECTS.length;i++){
+    const o=OBJECTS[i];
+    let img=o.type==='sign'?sign1:o.type==='mailbox'?mailbox:o.type==='bench'?bench:null;
+    if(o.type==='stall'){
+      const stallImg=o.img==='stallRed'?stallRed:stallBlue;
+      if(stallImg.complete)ctx.drawImage(stallImg,0,0,64,64,o.x*s,o.y*s,64*SCALE,64*SCALE);
+    }else if(img&&img.complete){
+      const w=img.naturalWidth,h2=img.naturalHeight;
+      ctx.drawImage(img,0,0,w,h2,o.x*s,o.y*s,w*SCALE,h2*SCALE);
+    }
+  }
+  // Arrow indicator on near object
+  if(nearObj){
+    const cx=(nearObj.x+nearObj.w/2)*T*SCALE,cy=nearObj.y*T*SCALE-8*SCALE;
+    const bob=Math.sin(Date.now()/300)*3*SCALE;
+    ctx.fillStyle='#fff';ctx.beginPath();
+    ctx.moveTo(cx,cy+bob+5*SCALE);ctx.lineTo(cx-4*SCALE,cy+bob);ctx.lineTo(cx+4*SCALE,cy+bob);ctx.fill();
+  }
+}
+
+function drawPlayer(){
+  const spr=playerType==='male'?charMale:charFemale;
+  if(!spr.complete)return;
+  // Spritesheet: 3 cols x 3 rows, each frame 16x24 (tuxedo) or 16x~25 (kaylee)
+  const fw=16,fh=Math.floor(spr.naturalHeight/3);
+  // Row: 0=down, 1=up(back), 2=side(left-facing)
+  const dirRow=[1,0,2,2]; // dir: 0=up,1=down,2=left,3=right(flip of left)
+  const row=dirRow[player.dir];
+  const col=Math.floor(Date.now()/200)%3; // animate walk
+  const sx=col*fw,sy=row*fh;
+  // Position centered on tile
+  const px=(player.x*T+8)*SCALE-fw*SCALE/2;
+  const py=(player.y*T+16)*SCALE-fh*SCALE;
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();
+  ctx.ellipse((player.x*T+8)*SCALE,(player.y*T+14)*SCALE,8*SCALE,4*SCALE,0,0,Math.PI*2);ctx.fill();
+  // Draw frame (flip for right if spritesheet only has left)
+  ctx.save();
+  if(player.dir===3){
+    ctx.translate((player.x*T+8)*SCALE,0);ctx.scale(-1,1);
+    ctx.drawImage(spr,sx,sy,fw,fh,-fw*SCALE/2,py,fw*SCALE,fh*SCALE);
+  }else{
+    ctx.drawImage(spr,sx,sy,fw,fh,px,py,fw*SCALE,fh*SCALE);
+  }
+  ctx.restore();
+}
+
+function update(){
+  if(document.getElementById('modal-overlay').classList.contains('active'))return;
+  moveTimer++;if(moveTimer<6)return;
+  let dx=0,dy=0;
+  if(keys.ArrowUp||keys.w)dy=-1;else if(keys.ArrowDown||keys.s)dy=1;
+  else if(keys.ArrowLeft||keys.a)dx=-1;else if(keys.ArrowRight||keys.d)dx=1;
+  if(dx||dy){moveTimer=0;player.dir=dy<0?0:dy>0?1:dx<0?2:3;const nx=player.x+dx,ny=player.y+dy;if(!blocked(nx,ny)){player.x=nx;player.y=ny;}}
+  // Check proximity
+  nearObj=null;
+  for(let o of OBJECTS){
+    const cx=o.x+Math.floor(o.w/2),cy=o.y+Math.floor(o.h/2);
+    if(Math.abs(player.x-cx)<=Math.max(2,Math.floor(o.w/2)+1)&&Math.abs(player.y-cy)<=Math.max(2,Math.floor(o.h/2)+1)){nearObj=o;break;}
+  }
+  const hint=document.getElementById('interact-hint');
+  if(nearObj){hint.classList.add('active');hint.textContent='Space: '+nearObj.label;}else hint.classList.remove('active');
+}
+
+function render(){
+  ctx.clearRect(0,0,CW,CH);
+  drawGround();
+  drawFence();
+  drawDecos();
+  drawObjects();
+  drawPlayer();
+}
+
+function gameLoop(){update();render();requestAnimationFrame(gameLoop);}
+const bgm=new Audio('Still X Oceans X Goodness Of God X How Great Is Our God X What A Beautiful Name Christian Mash up(1).mp3');bgm.loop=true;bgm.volume=0.4;
+function startGame(){if(gameStarted)return;gameStarted=true;calcScale();gameLoop();}
+window.addEventListener('resize',()=>{if(gameStarted)calcScale();});
+
+// Personalization via URL param
+const gn=new URLSearchParams(window.location.search).get('to');
+if(gn)MODALS.info.body='<p style="text-align:center"><b>Kepada Yth,</b></p><p style="text-align:center">'+gn+'</p><hr>'+MODALS.info.body;
+</script>
+</body>
+</html>
