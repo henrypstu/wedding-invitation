@@ -23,7 +23,7 @@ body{background:#1a1a2e;font-family:'Courier New',monospace;overflow:hidden;heig
 .char-option:hover,.char-option:active{border-color:#4caf50;background:rgba(76,175,80,.2);transform:scale(1.05)}
 .char-option .label{font-size:14px;color:#fff}
 .char-option canvas{display:block;margin:0 auto 10px;image-rendering:pixelated}
-#game-screen{background:#3a7a20;justify-content:flex-start;align-items:center;padding-top:10px}
+#game-screen{background:#2a5a10;justify-content:flex-start;align-items:center;padding:0}
 canvas#game{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;justify-content:center;align-items:center;padding:20px}
 #modal-overlay.active{display:flex}
@@ -122,7 +122,7 @@ const stallRed=loadImg('preferences-2/lpc_bazaar_rework-1.0-1/PNG/32x32/bazaar_t
 
 // Character select preview
 charMale.onload=()=>{const c=document.getElementById('prev-m').getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(charMale,0,0,16,24,8,12,32,48);};
-charFemale.onload=()=>{const c=document.getElementById('prev-f').getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(charFemale,0,0,16,25,8,12,32,50);};
+charFemale.onload=()=>{const c=document.getElementById('prev-f').getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(charFemale,0,0,16,19,8,12,32,38);};
 
 // --- CHURCH COURTYARD LAYOUT (30x22) ---
 // Concept: Fenced church yard. House=chapel at top center, fountain in middle,
@@ -179,13 +179,26 @@ gallery:{title:'📸 Gallery',body:'<div style="display:grid;grid-template-colum
 };
 
 let player={x:14,y:19,dir:0},keys={},nearObj=null,moveTimer=0;
+let cam={x:0,y:0}; // camera offset in pixels
 
 function calcScale(){
-  const maxW=window.innerWidth, maxH=window.innerHeight-20;
-  SCALE=Math.max(1,Math.min(Math.floor(maxW/(COLS*T)),Math.floor(maxH/(ROWS*T)),3));
-  CW=COLS*T*SCALE;CH=ROWS*T*SCALE;
+  const maxW=window.innerWidth, maxH=window.innerHeight;
+  // Scale so tiles are nicely visible on mobile (aim for ~20px per tile on small screens)
+  SCALE=Math.max(2,Math.min(Math.floor(maxW/(20)),Math.floor(maxH/(15)),4));
+  // Canvas fills the whole screen
+  CW=maxW;CH=maxH;
   canvas.width=CW;canvas.height=CH;
   canvas.style.width=CW+'px';canvas.style.height=CH+'px';
+}
+
+function updateCamera(){
+  // Center camera on player
+  const px=(player.x*T+8)*SCALE, py=(player.y*T+8)*SCALE;
+  cam.x=px-CW/2; cam.y=py-CH/2;
+  // Clamp to map bounds
+  const mapW=COLS*T*SCALE, mapH=ROWS*T*SCALE;
+  cam.x=Math.max(0,Math.min(cam.x,mapW-CW));
+  cam.y=Math.max(0,Math.min(cam.y,mapH-CH));
 }
 
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='game-screen'){startGame();document.getElementById('controls').classList.add('active');}}
@@ -250,75 +263,69 @@ function getDirtTile(x,y){
 
 function drawGround(){
   const s=T*SCALE;
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-    ctx.drawImage(grass,0,0,16,16,x*s,y*s,s,s);
-    // Subtle dark grass variation
-    if((x+y*3)%7===0)ctx.drawImage(darkGrass,0,0,16,16,x*s,y*s,s,s);
-    // Dirt path
+  // Only render visible tiles
+  const startX=Math.max(0,Math.floor(cam.x/s));
+  const startY=Math.max(0,Math.floor(cam.y/s));
+  const endX=Math.min(COLS,Math.ceil((cam.x+CW)/s)+1);
+  const endY=Math.min(ROWS,Math.ceil((cam.y+CH)/s)+1);
+  for(let y=startY;y<endY;y++)for(let x=startX;x<endX;x++){
+    const dx=x*s-cam.x,dy=y*s-cam.y;
+    ctx.drawImage(grass,0,0,16,16,dx,dy,s,s);
+    if((x+y*3)%7===0)ctx.drawImage(darkGrass,0,0,16,16,dx,dy,s,s);
     if(PATH[y][x]===1){
       const tile=getDirtTile(x,y);
-      if(tile)ctx.drawImage(tile,0,0,16,16,x*s,y*s,s,s);
+      if(tile)ctx.drawImage(tile,0,0,16,16,dx,dy,s,s);
     }
   }
 }
 
 function drawFence(){
   const s=T*SCALE,f=FENCE;
-  // Top edge
   for(let x=f.x;x<f.x+f.w;x++){
     let tile=x===f.x?wfTL:x===f.x+f.w-1?wfTR:wfTM;
-    if(tile&&tile.complete)ctx.drawImage(tile,0,0,16,16,x*s,f.y*s,s,s);
+    if(tile&&tile.complete)ctx.drawImage(tile,0,0,16,16,x*s-cam.x,f.y*s-cam.y,s,s);
   }
-  // Bottom edge
   for(let x=f.x;x<f.x+f.w;x++){
-    if(x>=f.gateX&&x<f.gateX+f.gateW)continue;// gate opening
+    if(x>=f.gateX&&x<f.gateX+f.gateW)continue;
     let tile=x===f.x?wfBL:x===f.x+f.w-1?wfBR:wfBM;
-    if(tile&&tile.complete)ctx.drawImage(tile,0,0,16,16,x*s,(f.y+f.h-1)*s,s,s);
+    if(tile&&tile.complete)ctx.drawImage(tile,0,0,16,16,x*s-cam.x,(f.y+f.h-1)*s-cam.y,s,s);
   }
-  // Left edge
-  for(let y=f.y+1;y<f.y+f.h-1;y++){if(wfLM.complete)ctx.drawImage(wfLM,0,0,16,16,f.x*s,y*s,s,s);}
-  // Right edge
-  for(let y=f.y+1;y<f.y+f.h-1;y++){if(wfRM.complete)ctx.drawImage(wfRM,0,0,16,16,(f.x+f.w-1)*s,y*s,s,s);}
+  for(let y=f.y+1;y<f.y+f.h-1;y++){if(wfLM.complete)ctx.drawImage(wfLM,0,0,16,16,f.x*s-cam.x,y*s-cam.y,s,s);}
+  for(let y=f.y+1;y<f.y+f.h-1;y++){if(wfRM.complete)ctx.drawImage(wfRM,0,0,16,16,(f.x+f.w-1)*s-cam.x,y*s-cam.y,s,s);}
 }
 
 function drawDecos(){
   const s=T*SCALE;
-  // Draw trees/bushes
   const imgMap={tree1,tree2,pine:pineTree,bush:bushImg};
   for(let t of TREES){
     const img=imgMap[t.img];if(!img||!img.complete)continue;
-    ctx.drawImage(img,0,0,img.naturalWidth,img.naturalHeight,t.x*s,t.y*s,img.naturalWidth*SCALE,img.naturalHeight*SCALE);
+    ctx.drawImage(img,0,0,img.naturalWidth,img.naturalHeight,t.x*s-cam.x,t.y*s-cam.y,img.naturalWidth*SCALE,img.naturalHeight*SCALE);
   }
-  // Flowers
   for(let f of FLOWERS){
     const img=(f[0]+f[1])%2===0?flowers1:flowers2;
-    if(img&&img.complete)ctx.drawImage(img,0,0,16,16,f[0]*s,f[1]*s,s,s);
+    if(img&&img.complete)ctx.drawImage(img,0,0,16,16,f[0]*s-cam.x,f[1]*s-cam.y,s,s);
   }
 }
 
 function drawObjects(){
   const s=T*SCALE;
-  // House
   const h=OBJECTS[0];
-  if(house1.complete)ctx.drawImage(house1,0,0,112,112,(h.x*T)*SCALE,(h.y*T)*SCALE,112*SCALE,112*SCALE);
-  // Fountain
+  if(house1.complete)ctx.drawImage(house1,0,0,112,112,(h.x*T)*SCALE-cam.x,(h.y*T)*SCALE-cam.y,112*SCALE,112*SCALE);
   const f=OBJECTS[1];
-  if(fountain.complete)ctx.drawImage(fountain,0,0,64,48,(f.x*T)*SCALE,(f.y*T)*SCALE,64*SCALE,48*SCALE);
-  // Signs, mailboxes, bench, stalls
+  if(fountain.complete)ctx.drawImage(fountain,0,0,64,48,(f.x*T)*SCALE-cam.x,(f.y*T)*SCALE-cam.y,64*SCALE,48*SCALE);
   for(let i=2;i<OBJECTS.length;i++){
     const o=OBJECTS[i];
     let img=o.type==='sign'?sign1:o.type==='mailbox'?mailbox:o.type==='bench'?bench:null;
     if(o.type==='stall'){
       const stallImg=o.img==='stallRed'?stallRed:stallBlue;
-      if(stallImg.complete)ctx.drawImage(stallImg,0,0,64,64,o.x*s,o.y*s,64*SCALE,64*SCALE);
+      if(stallImg.complete)ctx.drawImage(stallImg,0,0,64,64,o.x*s-cam.x,o.y*s-cam.y,64*SCALE,64*SCALE);
     }else if(img&&img.complete){
       const w=img.naturalWidth,h2=img.naturalHeight;
-      ctx.drawImage(img,0,0,w,h2,o.x*s,o.y*s,w*SCALE,h2*SCALE);
+      ctx.drawImage(img,0,0,w,h2,o.x*s-cam.x,o.y*s-cam.y,w*SCALE,h2*SCALE);
     }
   }
-  // Arrow indicator on near object
   if(nearObj){
-    const cx=(nearObj.x+nearObj.w/2)*T*SCALE,cy=nearObj.y*T*SCALE-8*SCALE;
+    const cx=(nearObj.x+nearObj.w/2)*T*SCALE-cam.x,cy=nearObj.y*T*SCALE-8*SCALE-cam.y;
     const bob=Math.sin(Date.now()/300)*3*SCALE;
     ctx.fillStyle='#fff';ctx.beginPath();
     ctx.moveTo(cx,cy+bob+5*SCALE);ctx.lineTo(cx-4*SCALE,cy+bob);ctx.lineTo(cx+4*SCALE,cy+bob);ctx.fill();
@@ -328,23 +335,20 @@ function drawObjects(){
 function drawPlayer(){
   const spr=playerType==='male'?charMale:charFemale;
   if(!spr.complete)return;
-  // Spritesheet: 3 cols x 3 rows, each frame 16x24 (tuxedo) or 16x~25 (kaylee)
-  const fw=16,fh=Math.floor(spr.naturalHeight/3);
-  // Row: 0=down, 1=up(back), 2=side(left-facing)
-  const dirRow=[1,0,2,2]; // dir: 0=up,1=down,2=left,3=right(flip of left)
-  const row=dirRow[player.dir];
-  const col=Math.floor(Date.now()/200)%3; // animate walk
+  const isMale=playerType==='male';
+  const fw=16,fh=isMale?24:19;
+  let row;
+  if(isMale){row=[1,0,2,2][player.dir];}
+  else{row=[1,0,2,3][player.dir];}
+  const col=Math.floor(Date.now()/200)%3;
   const sx=col*fw,sy=row*fh;
-  // Position centered on tile
-  const px=(player.x*T+8)*SCALE-fw*SCALE/2;
-  const py=(player.y*T+16)*SCALE-fh*SCALE;
-  // Shadow
+  const px=(player.x*T+8)*SCALE-fw*SCALE/2-cam.x;
+  const py=(player.y*T+16)*SCALE-fh*SCALE-cam.y;
   ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();
-  ctx.ellipse((player.x*T+8)*SCALE,(player.y*T+14)*SCALE,8*SCALE,4*SCALE,0,0,Math.PI*2);ctx.fill();
-  // Draw frame (flip for right if spritesheet only has left)
+  ctx.ellipse((player.x*T+8)*SCALE-cam.x,(player.y*T+14)*SCALE-cam.y,8*SCALE,4*SCALE,0,0,Math.PI*2);ctx.fill();
   ctx.save();
-  if(player.dir===3){
-    ctx.translate((player.x*T+8)*SCALE,0);ctx.scale(-1,1);
+  if(isMale&&player.dir===3){
+    ctx.translate((player.x*T+8)*SCALE-cam.x,0);ctx.scale(-1,1);
     ctx.drawImage(spr,sx,sy,fw,fh,-fw*SCALE/2,py,fw*SCALE,fh*SCALE);
   }else{
     ctx.drawImage(spr,sx,sy,fw,fh,px,py,fw*SCALE,fh*SCALE);
@@ -370,7 +374,8 @@ function update(){
 }
 
 function render(){
-  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle='#2a5a10';ctx.fillRect(0,0,CW,CH);
+  updateCamera();
   drawGround();
   drawFence();
   drawDecos();
