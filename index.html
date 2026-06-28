@@ -183,9 +183,8 @@ let cam={x:0,y:0}; // camera offset in pixels
 
 function calcScale(){
   const maxW=window.innerWidth, maxH=window.innerHeight;
-  // Scale so tiles are nicely visible on mobile (aim for ~20px per tile on small screens)
-  SCALE=Math.max(2,Math.min(Math.floor(maxW/(20)),Math.floor(maxH/(15)),4));
-  // Canvas fills the whole screen
+  // Show ~18 tiles horizontally on any screen
+  SCALE=Math.max(1,maxW/(18*T));
   CW=maxW;CH=maxH;
   canvas.width=CW;canvas.height=CH;
   canvas.style.width=CW+'px';canvas.style.height=CH+'px';
